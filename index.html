@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MolecuLens - Explore Molecules in 2D and 3D</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.2/3Dmol-min.js"></script>
+<style>
+:root{--bg:#070b17;--panel:#0f1730;--panel2:#131d3b;--line:#22305a;--ink:#e8eefc;--muted:#8fa0c8;--cyan:#4de1ff;--mint:#59f0c4;--violet:#9b8cff;--amber:#ffc86b}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);min-height:100vh;position:relative}
+/* chemistry background: hexagon lattice + glowing orbs */
+body:before{content:"";position:fixed;inset:0;z-index:-2;
+ background:
+  radial-gradient(circle at 15% 10%,#1b2a6b66 0,transparent 35%),
+  radial-gradient(circle at 90% 85%,#0d6b7a55 0,transparent 38%),
+  radial-gradient(circle at 70% 20%,#5a3fb040 0,transparent 30%),
+  var(--bg)}
+body:after{content:"";position:fixed;inset:0;z-index:-1;opacity:.55;pointer-events:none;
+ background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='112' height='194' viewBox='0 0 112 194'><g fill='none' stroke='%2337508f' stroke-width='1.2' opacity='.55'><path d='M56 2 L108 32 L108 92 L56 122 L4 92 L4 32 Z'/><path d='M56 98 L108 128 L108 188 L56 218 L4 188 L4 128 Z' transform='translate(0 -2)'/><path d='M56 62 L82 77 M56 62 L30 77 M56 62 L56 32'/></g><g fill='%234de1ff' opacity='.6'><circle cx='56' cy='2' r='2.4'/><circle cx='108' cy='32' r='2.4'/><circle cx='4' cy='92' r='2.4'/></g></svg>");
+ background-size:112px 194px;
+ -webkit-mask-image:radial-gradient(circle at 60% 30%,#000 0,transparent 85%);mask-image:radial-gradient(circle at 60% 30%,#000 0,transparent 85%)}
+.layout{display:grid;grid-template-columns:270px 1fr;min-height:100vh}
+/* sidebar */
+.sidebar{position:sticky;top:0;height:100vh;padding:26px 18px;background:linear-gradient(180deg,#0d1530ee,#0a1024ee);border-right:1px solid var(--line);backdrop-filter:blur(8px);display:flex;flex-direction:column;gap:20px;overflow:auto}
+.brand{display:flex;align-items:center;gap:11px}
+.logo{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:1.4rem;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#06101f;box-shadow:0 0 22px #4de1ff55}
+.brand h1{margin:0;font-size:1.25rem;letter-spacing:.01em}
+.brand small{display:block;color:var(--muted);font-size:.72rem;margin-top:2px}
+.side-label{font-size:.68rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.nav{display:flex;flex-direction:column;gap:9px}
+.nav button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px;border-radius:14px;border:1px solid var(--line);background:#0f1832;color:var(--ink);font:inherit;cursor:pointer;transition:.2s}
+.nav button:hover{border-color:var(--cyan);transform:translateX(3px)}
+.nav button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.nav button.active{background:linear-gradient(135deg,#17306a,#10305a);border-color:var(--cyan);box-shadow:0 0 18px #4de1ff30}
+.nav .sym{flex:0 0 40px;height:40px;border-radius:11px;display:grid;place-items:center;font-weight:900;font-size:.9rem;background:#0a1228;color:var(--cyan);border:1px solid #2a3d73}
+.nav strong{display:block;font-size:.95rem}
+.nav small{display:block;color:var(--muted);font-size:.74rem;margin-top:2px}
+.side-foot{margin-top:auto;font-size:.72rem;line-height:1.55;color:var(--muted)}
+/* main */
+main{padding:34px clamp(18px,4vw,48px) 50px;min-width:0;max-width:1120px}
+.eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.72rem;font-weight:800;color:var(--mint)}
+.title-row{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.title-row h2{margin:8px 0 4px;font-size:clamp(2rem,4.5vw,3.2rem);line-height:1.05;background:linear-gradient(90deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+.aliases{color:var(--muted);font-size:.95rem}
+.formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:800;font-size:1.15rem;padding:9px 14px;border-radius:12px;color:var(--cyan);background:#0c1630;border:1px solid var(--line);box-shadow:0 0 16px #4de1ff1f}
+.pill{display:inline-block;padding:5px 10px;border-radius:99px;background:#59f0c41a;color:var(--mint);border:1px solid #59f0c455;font-size:.72rem;font-weight:800;margin:10px 6px 0 0}
+.intro{color:#b9c6e6;line-height:1.7;max-width:760px;margin:14px 0 0}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}
+.fact{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:14px}
+.fact small{display:block;color:var(--muted);font-size:.72rem;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em}
+.fact strong{font-size:1.02rem;color:#fff}
+.viz{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:20px;padding:18px;min-width:0}
+.card h3{margin:0 0 3px;font-size:1.02rem}
+.sub{color:var(--muted);font-size:.8rem;margin:0 0 12px}
+.box2d{height:300px;border-radius:14px;background:#f4f7ff;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.box2d img{max-width:100%;max-height:300px;object-fit:contain}
+.box2d .error{color:#4a5a80}
+.viewer{height:300px;width:100%;position:relative;border-radius:14px;overflow:hidden;background:radial-gradient(circle at center,#16254d,#070d1f);border:1px solid var(--line)}
+.note-s{font-size:.74rem;color:var(--muted);margin:10px 0 0;line-height:1.5}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.label{font-size:.68rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--violet);margin-bottom:6px}
+.list{margin:12px 0 0;padding-left:18px;line-height:1.65;color:#c4d0ee}
+.list li{margin:7px 0}
+.list li::marker{color:var(--cyan)}
+.wide{grid-column:1/-1}
+.safety{margin-top:18px;border:1px solid #ffc86b55;background:#ffc86b12;color:#ffdca0;border-radius:14px;padding:13px 15px;font-size:.84rem;line-height:1.6}
+.footer{margin-top:24px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem;line-height:1.6}
+.error{padding:20px;color:var(--muted);text-align:center;font-size:.9rem}
+@media(max-width:900px){
+ .layout{grid-template-columns:1fr}
+ .sidebar{position:relative;height:auto;flex-direction:column;border-right:0;border-bottom:1px solid var(--line);padding:16px}
+ .nav{flex-direction:row;overflow-x:auto;padding-bottom:4px}
+ .nav button{min-width:190px}
+ .side-foot{display:none}
+ .facts{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:680px){.viz,.grid{grid-template-columns:1fr}.title-row{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" aria-label="Molecule navigation">
+    <div class="brand">
+      <div class="logo">⚛</div>
+      <div><h1>MolecuLens</h1><small>See molecules up close</small></div>
+    </div>
+    <div>
+      <div class="side-label" style="margin-bottom:10px">Molecules</div>
+      <nav class="nav" id="nav"></nav>
+    </div>
+    <div class="side-foot">Pick a molecule to see its 2D structure, a rotatable 3D model and its chemistry profile.</div>
+  </aside>
+ 
+  <main>
+    <div class="eyebrow">Selected molecule</div>
+    <div class="title-row">
+      <div>
+        <h2 id="name"></h2>
+        <div class="aliases" id="aliases"></div>
+        <div id="tags"></div>
+      </div>
+      <div class="formula" id="formula"></div>
+    </div>
+    <p class="intro" id="intro"></p>
+    <div class="facts" id="facts"></div>
+ 
+    <div class="viz">
+      <section class="card">
+        <h3>2D structure</h3>
+        <p class="sub">Bond connectivity and functional groups</p>
+        <div class="box2d" id="structure2d"><div class="error">Loading 2D structure…</div></div>
+        <p class="note-s">2D depiction supplied by PubChem.</p>
+      </section>
+      <section class="card">
+        <h3>3D molecular model</h3>
+        <p class="sub">Drag to rotate · Scroll or pinch to zoom</p>
+        <div class="viewer" id="viewer3d"><div class="error">Loading interactive 3D model…</div></div>
+        <p class="note-s">Atoms are spheres, bonds are sticks. 3D conformations are model representations.</p>
+      </section>
+    </div>
+ 
+    <div class="grid">
+      <section class="card"><div class="label">Physical properties</div><h3>What it's like as a substance</h3><ul class="list" id="physical"></ul></section>
+      <section class="card"><div class="label">Structure</div><h3>Formula, molar mass, bond lengths &amp; orders</h3><ul class="list" id="structure"></ul><p class="note-s">Bond lengths are approximate representative values in ångströms (Å). Bond orders use common Lewis/resonance models and can vary with environment.</p></section>
+      <section class="card"><div class="label">Chemical behavior</div><h3>How it reacts</h3><ul class="list" id="chemical"></ul></section>
+      <section class="card"><div class="label">Uses</div><h3>Where it's useful</h3><ul class="list" id="uses"></ul></section>
+      <section class="card wide"><div class="label">Everyday connections</div><h3>Real-life examples</h3><ul class="list" id="examples"></ul></section>
+    </div>
+ 
+    <div class="safety" id="safety"></div>
+    <div class="footer">Learning resource · Values are approximate and vary with temperature, pressure and purity. Structures and 3D coordinates are retrieved from PubChem when you are online. Not medical advice or handling instructions.</div>
+  </main>
+</div>
+ 
+<script>
+const molecules = [
+{id:'caffeine',symbol:'Cf',name:'Caffeine',aliases:'Naturally occurring stimulant · Alkaloid',formula:'C₈H₁₀N₄O₂',cid:2519,
+ intro:'Caffeine is a nitrogen-containing organic molecule found naturally in coffee, tea, cacao and several other plants. It affects the nervous system mainly by blocking adenosine receptors.',
+ facts:[['Molar mass','194.19 g/mol'],['Melting point','~235 °C'],['Boiling point','Sublimes ~178 °C'],['At room temp.','Solid']],
+ physical:['White, crystalline solid when purified.','Moderately soluble in water; solubility increases in hot water.','Bitter taste; naturally present in several plant species.'],
+ chemical:['Contains fused nitrogen-containing rings and two carbonyl groups.','A weak base; its nitrogen atoms differ in basicity because of the ring structure.','Analyzed using chromatography and spectroscopy.'],
+ uses:['Ingredient in coffee, tea, energy drinks and some soft drinks.','Used in some medicines, including certain headache formulations.','Studied in food science and pharmacology.'],
+ examples:['A cup of brewed coffee or tea.','Cacao and chocolate contain smaller amounts that vary by product.','Some over-the-counter headache products combine caffeine with pain relievers.'],
+ tags:['Alkaloid','Bioactive'],
+ structure:['Molecular formula: C₈H₁₀N₄O₂.','Molar mass: 194.19 g/mol.','Bond lengths: carbonyl C=O ≈ 1.22 Å; ring C–N bonds about 1.34–1.40 Å.','Bond orders: carbonyl C=O bonds are approximately double; bonds in the conjugated nitrogen rings have delocalized, partial double-bond character.'],
+ safety:'Caffeine is biologically active. Having it in a product does not mean unlimited use is safe.'},
+{id:'aspirin',symbol:'As',name:'Aspirin',aliases:'Acetylsalicylic acid · Salicylate medicine',formula:'C₉H₈O₄',cid:2244,
+ intro:'Aspirin is acetylsalicylic acid, a molecule containing an aromatic ring, a carboxylic acid group and an ester group. It is used as a pain reliever and has anti-inflammatory and antiplatelet effects.',
+ facts:[['Molar mass','180.16 g/mol'],['Melting point','~136 °C'],['Boiling point','Decomposes'],['At room temp.','Solid']],
+ physical:['White crystalline powder or crystals.','Only slightly soluble in water; dissolves better in some organic solvents.','Can slowly hydrolyze in moisture to salicylic acid and acetic acid.'],
+ chemical:['Contains both an ester and a carboxylic acid functional group.','Hydrolysis breaks the ester bond, forming salicylic acid plus acetic acid.','Its biological action includes inhibition of cyclooxygenase enzymes.'],
+ uses:['Medicine for pain, fever and inflammation in appropriate situations.','Low-dose aspirin is prescribed for certain cardiovascular indications by clinicians.'],
+ examples:['Aspirin tablets sold as a pain-relief medicine.','Used in some clinical settings to reduce platelet aggregation when medically indicated.'],
+ tags:['Ester','Medicine'],
+ structure:['Molecular formula: C₉H₈O₄.','Molar mass: 180.16 g/mol.','Bond lengths: aromatic C–C ≈ 1.39 Å; carbonyl C=O ≈ 1.20–1.22 Å; ester C–O ≈ 1.33–1.36 Å.','Bond orders: carbonyl C=O bonds are approximately double; aromatic ring bonds are delocalized; remaining C–O and C–C bonds are generally single, with some resonance effects.'],
+ safety:'Aspirin is a medicine. Use it only as directed by a clinician or the product label.'},
+{id:'benzene',symbol:'Bz',name:'Benzene',aliases:'Aromatic hydrocarbon · Six-membered carbon ring',formula:'C₆H₆',cid:241,
+ intro:'Benzene is a simple aromatic ring molecule. Its six carbon atoms share a delocalized set of π electrons, giving the ring unusual stability and characteristic aromatic chemistry.',
+ facts:[['Molar mass','78.11 g/mol'],['Melting point','5.5 °C'],['Boiling point','80.1 °C'],['At room temp.','Liquid']],
+ physical:['Colorless, volatile liquid with a characteristic sweet odor.','Poorly soluble in water; mixes with many organic solvents.','Highly flammable and evaporates readily.'],
+ chemical:['Aromatic ring is stabilized by delocalized π electrons.','Often undergoes electrophilic aromatic substitution rather than simple addition.','Complete combustion gives carbon dioxide and water; incomplete combustion can form soot.'],
+ uses:['Industrial feedstock for ethylbenzene, cumene, cyclohexane and other chemicals.','Used in controlled industrial processes to make plastics, resins and synthetic fibers.'],
+ examples:['Starting material in supply chains for polystyrene packaging and some synthetic materials.','Not a household ingredient: exposure is minimized because benzene is carcinogenic.'],
+ tags:['Aromatic','Flammable'],
+ structure:['Molecular formula: C₆H₆.','Molar mass: 78.11 g/mol.','Bond lengths: C–C ≈ 1.39 Å; C–H ≈ 1.09 Å.','Bond orders: all six C–C bonds are equivalent in the resonance model (average bond order ≈ 1.5); C–H bonds are single.'],
+ safety:'Benzene is a known human carcinogen and is highly flammable.'},
+{id:'ethanol',symbol:'Et',name:'Ethanol',aliases:'Ethyl alcohol · A two-carbon alcohol',formula:'C₂H₆O',cid:702,
+ intro:'Ethanol is a small alcohol with a polar hydroxyl (–OH) group and a short carbon chain. That combination helps it mix with water and dissolve many other substances.',
+ facts:[['Molar mass','46.07 g/mol'],['Melting point','−114.1 °C'],['Boiling point','78.4 °C'],['At room temp.','Liquid']],
+ physical:['Colorless, volatile liquid with a recognizable odor.','Miscible with water in all proportions.','Flammable; pure ethanol burns with a pale blue flame.'],
+ chemical:['The –OH group allows hydrogen bonding and contributes to water miscibility.','Can be oxidized to ethanal and then ethanoic acid under suitable conditions.','Can dehydrate to form ethene under suitable conditions.'],
+ uses:['Solvent in perfumes, inks, laboratory products and some medicines.','Fuel or fuel additive in many countries.','Antiseptic in appropriately formulated products.'],
+ examples:['Hand sanitizers and some surface disinfectants.','Perfumes, extracts and some cleaning formulations.','Ethanol blended into motor fuel.'],
+ tags:['Alcohol','Solvent'],
+ structure:['Molecular formula: C₂H₆O.','Molar mass: 46.07 g/mol.','Bond lengths: C–C ≈ 1.54 Å; C–O ≈ 1.43 Å; O–H ≈ 0.96 Å.','Bond orders: C–C, C–O, O–H and C–H are all single bonds (bond order 1).'],
+ safety:'Ethanol is flammable. Keep it away from flames and sparks.'}
+];
+ 
+const $ = id => document.getElementById(id);
+const sdfCache = {};
+let active = null, viewer = null;
+ 
+function renderList(id, items){ $(id).innerHTML = items.map(x => `<li>${x}</li>`).join(''); }
+ 
+function load2d(m){
+  const box = $('structure2d');
+  box.innerHTML = '<div class="error">Loading 2D structure…</div>';
+  const img = new Image();
+  img.alt = `2D structure of ${m.name}`;
+  img.onload = () => { if (active === m.id) { box.innerHTML = ''; box.appendChild(img); } };
+  img.onerror = () => { if (active === m.id) box.innerHTML = '<div class="error">Could not load the 2D structure. Check your internet connection.</div>'; };
+  img.src = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${m.cid}/PNG?record_type=2d&image_size=400x300`;
+}
+ 
+async function load3d(m){
+  const target = $('viewer3d');
+  if (viewer) { try { viewer.clear(); } catch(e){} viewer = null; }
+  target.innerHTML = '<div class="error">Loading interactive 3D model…</div>';
+  if (!window.$3Dmol) { target.innerHTML = '<div class="error">The 3D viewer library did not load. Check your internet connection.</div>'; return; }
+  try {
+    if (!sdfCache[m.id]) {
+      const res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${m.cid}/SDF?record_type=3d`);
+      if (!res.ok) throw new Error('3D coordinates unavailable');
+      sdfCache[m.id] = await res.text();
+    }
+    if (active !== m.id) return;
+    target.innerHTML = '';
+    const v = $3Dmol.createViewer(target, {backgroundColor:'#0b1430', antialias:true});
+    viewer = v;
+    v.addModel(sdfCache[m.id], 'sdf');
+    v.setStyle({}, {stick:{radius:0.13}, sphere:{scale:0.23}});
+    v.zoomTo(); v.zoom(1.15); v.render(); v.spin(true);
+    setTimeout(() => { if (viewer === v) v.spin(false); }, 2500);
+  } catch (e) {
+    if (active === m.id) target.innerHTML = '<div class="error">A 3D model could not be loaded for this molecule.</div>';
+  }
+}
+ 
+function render(m){
+  active = m.id;
+  document.querySelectorAll('.nav button').forEach(b => {
+    const on = b.dataset.id === m.id;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on);
+  });
+  $('name').textContent = m.name;
+  $('aliases').textContent = m.aliases;
+  $('tags').innerHTML = m.tags.map(t => `<span class="pill">${t}</span>`).join('');
+  $('formula').textContent = m.formula;
+  $('intro').textContent = m.intro;
+  $('facts').innerHTML = m.facts.map(([k,v]) => `<div class="fact"><small>${k}</small><strong>${v}</strong></div>`).join('');
+  renderList('physical', m.physical);
+  renderList('structure', m.structure);
+  renderList('chemical', m.chemical);
+  renderList('uses', m.uses);
+  renderList('examples', m.examples);
+  $('safety').innerHTML = '<strong>Safety note:</strong> ' + m.safety + ' This page is for education, not medical advice.';
+  document.title = `${m.name} · MolecuLens`;
+  load2d(m);
+  load3d(m);
+  if (location.hash !== '#' + m.id) history.replaceState(null, '', '#' + m.id);
+}
+ 
+molecules.forEach(m => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.dataset.id = m.id;
+  b.setAttribute('aria-pressed', 'false');
+  b.innerHTML = `<span class="sym">${m.symbol}</span><span><strong>${m.name}</strong><small>${m.formula}</small></span>`;
+  b.addEventListener('click', () => { render(m); window.scrollTo({top:0, behavior:'smooth'}); });
+  $('nav').appendChild(b);
+});
+ 
+window.addEventListener('resize', () => { if (viewer) { viewer.resize(); viewer.render(); } });
+ 
+const start = molecules.find(m => '#' + m.id === location.hash) || molecules[0];
+render(start);
+</script>
+</body>
+</html>
